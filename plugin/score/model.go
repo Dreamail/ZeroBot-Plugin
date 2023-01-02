@@ -4,7 +4,6 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/fumiama/sqlite3" // import sql
 	"github.com/jinzhu/gorm"
 )
 
@@ -107,7 +106,7 @@ func (sdb *scoredb) InsertOrUpdateSignInCountByUID(uid int64, count int) (err er
 	if err = db.Model(&signintable{}).First(&si, "uid = ? ", uid).Error; err != nil {
 		// error handling...
 		if gorm.IsRecordNotFoundError(err) {
-			db.Model(&signintable{}).Create(&si) // newUser not user
+			err = db.Model(&signintable{}).Create(&si).Error // newUser not user
 		}
 	} else {
 		err = db.Model(&signintable{}).Where("uid = ? ", uid).Update(

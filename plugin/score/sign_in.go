@@ -3,38 +3,44 @@ package score
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"os"
 	"strconv"
 	"time"
 
 	"github.com/Coloured-glaze/gg"
+	"github.com/FloatTech/floatbox/file"
+	"github.com/FloatTech/floatbox/img/writer"
+	"github.com/FloatTech/floatbox/process"
+	ctrl "github.com/FloatTech/zbpctrl"
+	"github.com/FloatTech/zbputils/control"
+	"github.com/FloatTech/zbputils/ctxext"
+	"github.com/FloatTech/zbputils/img"
+	"github.com/FloatTech/zbputils/img/text"
 	"github.com/golang/freetype"
 	log "github.com/sirupsen/logrus"
 	"github.com/wcharczuk/go-chart/v2"
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 
-	"github.com/FloatTech/floatbox/file"
-	"github.com/FloatTech/floatbox/img/writer"
-	ctrl "github.com/FloatTech/zbpctrl"
-	"github.com/FloatTech/zbputils/control"
-	"github.com/FloatTech/zbputils/ctxext"
-	"github.com/FloatTech/zbputils/img"
-	"github.com/FloatTech/zbputils/img/text"
+	// 货币系统
+	"github.com/FloatTech/AnimeAPI/wallet"
 )
 
 const (
 	backgroundURL = "https://img.moehu.org/pic.php?id=pc"
 	signinMax     = 1
-	// SCOREMAX 分数上限定为120
-	SCOREMAX = 120
+	// SCOREMAX 分数上限定为1200
+	SCOREMAX = 1200
 )
 
 var (
-	levelArray = [...]int{0, 1, 2, 5, 10, 20, 35, 55, 75, 100, 120}
-	engine     = control.Register("score", &ctrl.Options[*zero.Ctx]{
+	rankArray = [...]int{0, 10, 20, 50, 100, 200, 350, 550, 750, 1000, 1200}
+	engine    = control.Register("score", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault:  false,
-		Help:              "签到得分\n- 签到\n- 获得签到背景[@xxx] | 获得签到背景\n- 查看分数排名",
+		Brief:             "签到",
+		Help:              "- 签到\n- 获得签到背景[@xxx] | 获得签到背景\n- 查看等级排名\n注:为跨群排名\n- 查看我的钱包\n- 查看钱包排名\n注:为本群排行，若群人数太多不建议使用该功能!!!",
 		PrivateDataFolder: "score",
 	})
 )
@@ -54,20 +60,56 @@ func init() {
 			uid := ctx.Event.UserID
 			now := time.Now()
 			today := now.Format("20060102")
+			// 签到图片
+			drawedFile := cachePath + strconv.FormatInt(uid, 10) + today + "signin.png"
+			picFile := cachePath + strconv.FormatInt(uid, 10) + today + ".png"
+			// 获取签到时间
 			si := sdb.GetSignInByUID(uid)
 			siUpdateTimeStr := si.UpdatedAt.Format("20060102")
-			drawedFile := cachePath + strconv.FormatInt(uid, 10) + today + "signin.png"
-
-			picFile := cachePath + strconv.FormatInt(uid, 10) + today + ".png"
-
-			if si.Count >= signinMax && siUpdateTimeStr == today {
+			switch {
+			case si.Count >= signinMax && siUpdateTimeStr == today:
+				// 如果签到时间是今天
 				ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("今天你已经签到过了！"))
 				if file.IsExist(drawedFile) {
 					ctx.SendChain(message.Image("file:///" + file.BOTPATH + "/" + drawedFile))
 				}
 				return
+			case siUpdateTimeStr != today:
+				// 如果是跨天签到就清数据
+				err := sdb.InsertOrUpdateSignInCountByUID(uid, 0)
+				if err != nil {
+					ctx.SendChain(message.Text("ERROR: ", err))
+					return
+				}
 			}
-			err := initPic(picFile)
+			// 更新签到次数
+			err := sdb.InsertOrUpdateSignInCountByUID(uid, si.Count+1)
+			if err != nil {
+				ctx.SendChain(message.Text("ERROR: ", err))
+				return
+			}
+			// 更新经验
+			level := sdb.GetScoreByUID(uid).Score + 1
+			if level > SCOREMAX {
+				level = SCOREMAX
+				ctx.SendChain(message.At(uid), message.Text("你的等级已经达到上限"))
+			}
+			err = sdb.InsertOrUpdateScoreByUID(uid, level)
+			if err != nil {
+				ctx.SendChain(message.Text("ERROR: ", err))
+				return
+			}
+			// 更新钱包
+			rank := getrank(level)
+			add := 1 + rand.Intn(10) + rank*5 // 等级越高获得的钱越高
+			err = wallet.InsertWalletOf(uid, add)
+			if err != nil {
+				ctx.SendChain(message.Text("ERROR: ", err))
+				return
+			}
+			score := wallet.GetWalletOf(uid)
+			// 绘图
+			err = initPic(picFile)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
@@ -77,23 +119,15 @@ func init() {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
 			}
-			if siUpdateTimeStr != today {
-				_ = sdb.InsertOrUpdateSignInCountByUID(uid, 0)
-			}
-
-			_ = sdb.InsertOrUpdateSignInCountByUID(uid, si.Count+1)
-
 			// 避免图片过大，最大 1280*720
 			back = img.Limit(back, 1280, 720)
-
 			canvas := gg.NewContext(back.Bounds().Size().X, int(float64(back.Bounds().Size().Y)*1.7))
 			canvas.SetRGB(1, 1, 1)
 			canvas.Clear()
 			canvas.DrawImage(back, 0, 0)
-
 			monthWord := now.Format("01/02")
 			hourWord := getHourWord(now)
-			_, err = file.GetLazyData(text.BoldFontFile, true)
+			_, err = file.GetLazyData(text.BoldFontFile, control.Md5File, true)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
@@ -106,7 +140,7 @@ func init() {
 			canvas.DrawString(hourWord, float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.2)
 			canvas.DrawString(monthWord, float64(back.Bounds().Size().X)*0.6, float64(back.Bounds().Size().Y)*1.2)
 			nickName := ctx.CardOrNickName(uid)
-			_, err = file.GetLazyData(text.FontFile, true)
+			_, err = file.GetLazyData(text.FontFile, control.Md5File, true)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
@@ -115,32 +149,23 @@ func init() {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
 			}
-			add := 1
-			canvas.DrawString(nickName+fmt.Sprintf(" 小熊饼干+%d", add), float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.3)
-			score := sdb.GetScoreByUID(uid).Score
-			score += add
-			if score > SCOREMAX {
-				score = SCOREMAX
-				ctx.SendChain(message.At(uid), message.Text("你获得的小熊饼干已经达到上限"))
-			}
-			_ = sdb.InsertOrUpdateScoreByUID(uid, score)
-			level := getLevel(score)
-			canvas.DrawString("当前小熊饼干:"+strconv.FormatInt(int64(score), 10), float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.4)
-			canvas.DrawString("LEVEL:"+strconv.FormatInt(int64(level), 10), float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.5)
+			canvas.DrawString(nickName+fmt.Sprintf(" ATRI币+%d", add), float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.3)
+			canvas.DrawString("当前ATRI币:"+strconv.FormatInt(int64(score), 10), float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.4)
+			canvas.DrawString("LEVEL:"+strconv.FormatInt(int64(rank), 10), float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.5)
 			canvas.DrawRectangle(float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.55, float64(back.Bounds().Size().X)*0.6, float64(back.Bounds().Size().Y)*0.1)
 			canvas.SetRGB255(150, 150, 150)
 			canvas.Fill()
-			var nextLevelScore int
-			if level < 10 {
-				nextLevelScore = levelArray[level+1]
+			var nextrankScore int
+			if rank < 10 {
+				nextrankScore = rankArray[rank+1]
 			} else {
-				nextLevelScore = SCOREMAX
+				nextrankScore = SCOREMAX
 			}
 			canvas.SetRGB255(0, 0, 0)
-			canvas.DrawRectangle(float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.55, float64(back.Bounds().Size().X)*0.6*float64(score)/float64(nextLevelScore), float64(back.Bounds().Size().Y)*0.1)
+			canvas.DrawRectangle(float64(back.Bounds().Size().X)*0.1, float64(back.Bounds().Size().Y)*1.55, float64(back.Bounds().Size().X)*0.6*float64(level)/float64(nextrankScore), float64(back.Bounds().Size().Y)*0.1)
 			canvas.SetRGB255(102, 102, 102)
 			canvas.Fill()
-			canvas.DrawString(fmt.Sprintf("%d/%d", score, nextLevelScore), float64(back.Bounds().Size().X)*0.75, float64(back.Bounds().Size().Y)*1.62)
+			canvas.DrawString(fmt.Sprintf("%d/%d", level, nextrankScore), float64(back.Bounds().Size().X)*0.75, float64(back.Bounds().Size().Y)*1.62)
 
 			f, err := os.Create(drawedFile)
 			if err != nil {
@@ -174,7 +199,7 @@ func init() {
 			}
 			ctx.SendChain(message.Image("file:///" + file.BOTPATH + "/" + picFile))
 		})
-	engine.OnFullMatch("查看分数排名", zero.OnlyGroup).Limit(ctxext.LimitByGroup).SetBlock(true).
+	engine.OnFullMatch("查看等级排名", zero.OnlyGroup).Limit(ctxext.LimitByGroup).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			today := time.Now().Format("20060102")
 			drawedFile := cachePath + today + "scoreRank.png"
@@ -191,7 +216,7 @@ func init() {
 				ctx.SendChain(message.Text("ERROR: 目前还没有人签到过"))
 				return
 			}
-			_, err = file.GetLazyData(text.FontFile, true)
+			_, err = file.GetLazyData(text.FontFile, control.Md5File, true)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
@@ -211,17 +236,27 @@ func init() {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return
 			}
-			bars := make([]chart.Value, len(st))
-			for i, v := range st {
-				bars[i].Value = float64(v.Score)
-				bars[i].Label = ctx.CardOrNickName(v.UID)
+			var bars []chart.Value
+			for _, v := range st {
+				if v.Score != 0 {
+					bars = append(bars, chart.Value{
+						Label: ctx.CardOrNickName(v.UID),
+						Value: float64(v.Score),
+					})
+				}
 			}
 			err = chart.BarChart{
 				Font:  font,
-				Title: "饼干排名",
+				Title: "等级排名(1天只刷新1次)",
 				Background: chart.Style{
 					Padding: chart.Box{
 						Top: 40,
+					},
+				},
+				YAxis: chart.YAxis{
+					Range: &chart.ContinuousRange{
+						Min: 0,
+						Max: math.Ceil(bars[0].Value/10) * 10,
 					},
 				},
 				Height:   500,
@@ -256,8 +291,8 @@ func getHourWord(t time.Time) string {
 	}
 }
 
-func getLevel(count int) int {
-	for k, v := range levelArray {
+func getrank(count int) int {
+	for k, v := range rankArray {
 		if count == v {
 			return k
 		} else if count < v {
@@ -271,5 +306,6 @@ func initPic(picFile string) error {
 	if file.IsExist(picFile) {
 		return nil
 	}
-	return file.DownloadTo(backgroundURL, picFile, true)
+	defer process.SleepAbout1sTo2s()
+	return file.DownloadTo(backgroundURL, picFile)
 }

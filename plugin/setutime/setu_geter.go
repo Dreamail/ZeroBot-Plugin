@@ -2,6 +2,7 @@
 package setutime
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -53,8 +54,8 @@ var pool = &imgpool{
 func init() { // 插件主体
 	engine := control.Register("setutime", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Help: "涩图\n" +
-			"- 来份[涩图/二次元/风景/车万]\n" +
+		Brief:            "涩图",
+		Help: "- 来份[涩图/二次元/风景/车万]\n" +
 			"- 添加[涩图/二次元/风景/车万][P站图片ID]\n" +
 			"- 删除[涩图/二次元/风景/车万][P站图片ID]\n" +
 			"- >setu status",
@@ -154,6 +155,9 @@ func (p *imgpool) size(imgtype string) int {
 }
 
 func (p *imgpool) push(ctx *zero.Ctx, imgtype string, illust *pixiv.Illust) {
+	if len(illust.ImageUrls) == 0 {
+		return
+	}
 	u := illust.ImageUrls[0]
 	n := u[strings.LastIndex(u, "/")+1 : len(u)-4]
 	m, err := imagepool.GetImage(n)
@@ -221,6 +225,9 @@ func (p *imgpool) add(ctx *zero.Ctx, imgtype string, id int64) error {
 	illust, err := pixiv.Works(id)
 	if err != nil {
 		return err
+	}
+	if len(illust.ImageUrls) == 0 {
+		return errors.New("nil image url")
 	}
 	err = imagepool.SendImageFromPool(strconv.FormatInt(illust.Pid, 10)+"_p0", illust.Path(0), func() error {
 		return illust.DownloadToCache(0)

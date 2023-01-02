@@ -22,10 +22,9 @@ import (
 )
 
 const (
-	ua          = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36"
-	referer     = "https://www.bilibili.com/"
-	infoURL     = "https://api.bilibili.com/x/space/acc/info?mid=%v"
-	serviceName = "bilibilipush"
+	ua      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36"
+	referer = "https://www.bilibili.com/"
+	infoURL = "https://api.bilibili.com/x/space/acc/info?mid=%v"
 )
 
 // bdb bilibili推送数据库
@@ -38,16 +37,18 @@ var (
 )
 
 func init() {
-	en := control.Register(serviceName, &ctrl.Options[*zero.Ctx]{
+	en := control.Register("bilibilipush", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Help: "bilibilipush,需要配合job一起使用\n" +
-			"- 添加b站订阅[uid|name]\n" +
+		Brief:            "b站推送",
+		Help: "- 添加b站订阅[uid|name]\n" +
 			"- 取消b站订阅[uid|name]\n" +
 			"- 取消b站动态订阅[uid|name]\n" +
 			"- 取消b站直播订阅[uid|name]\n" +
 			"- b站推送列表\n" +
-			"- 拉取b站推送 (使用job执行定时任务------记录在\"@every 10s\"触发的指令)",
-		PrivateDataFolder: serviceName,
+			"Tips: 需要配合job一起使用, 全局只需要设置一个, 无视响应状态推送, 下为例子\n" +
+			"记录在\"@every 5m\"触发的指令)\n" +
+			"拉取b站推送",
+		PrivateDataFolder: "bilibilipush",
 	})
 
 	// 加载bilibili推送数据库
@@ -55,7 +56,7 @@ func init() {
 	dbfile := dbpath + "push.db"
 	bdb = initializePush(dbfile)
 
-	en.OnRegex(`^添加b站订阅\s?(.{1,25})$`, zero.UserOrGrpAdmin, getPara).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+	en.OnRegex(`^添加[B|b]站订阅\s?(.{1,25})$`, zero.UserOrGrpAdmin, getPara).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		buid, _ := strconv.ParseInt(ctx.State["uid"].(string), 10, 64)
 		name, err := getName(buid)
 		if err != nil {
@@ -72,7 +73,7 @@ func init() {
 		}
 		ctx.SendChain(message.Text("已添加" + name + "的订阅"))
 	})
-	en.OnRegex(`^取消b站订阅\s?(.{1,25})$`, zero.UserOrGrpAdmin, getPara).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+	en.OnRegex(`^取消[B|b]站订阅\s?(.{1,25})$`, zero.UserOrGrpAdmin, getPara).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		buid, _ := strconv.ParseInt(ctx.State["uid"].(string), 10, 64)
 		name, err := getName(buid)
 		if err != nil {
@@ -89,7 +90,7 @@ func init() {
 		}
 		ctx.SendChain(message.Text("已取消" + name + "的订阅"))
 	})
-	en.OnRegex(`^取消b站动态订阅\s?(.{1,25})$`, zero.UserOrGrpAdmin, getPara).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+	en.OnRegex(`^取消[B|b]站动态订阅\s?(.{1,25})$`, zero.UserOrGrpAdmin, getPara).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		buid, _ := strconv.ParseInt(ctx.State["uid"].(string), 10, 64)
 		name, err := getName(buid)
 		if err != nil {
@@ -106,7 +107,7 @@ func init() {
 		}
 		ctx.SendChain(message.Text("已取消" + name + "的动态订阅"))
 	})
-	en.OnRegex(`^取消b站直播订阅\s?(.{1,25})$`, zero.UserOrGrpAdmin, getPara).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+	en.OnRegex(`^取消[B|b]站直播订阅\s?(.{1,25})$`, zero.UserOrGrpAdmin, getPara).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		buid, _ := strconv.ParseInt(ctx.State["uid"].(string), 10, 64)
 		gid := ctx.Event.GroupID
 		if gid == 0 {
@@ -123,13 +124,13 @@ func init() {
 		}
 		ctx.SendChain(message.Text("已取消" + name + "的直播订阅"))
 	})
-	en.OnFullMatch("b站推送列表", zero.UserOrGrpAdmin).SetBlock(true).Handle(func(ctx *zero.Ctx) {
+	en.OnRegex(`^[B|b]站推送列表$`, zero.UserOrGrpAdmin).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		gid := ctx.Event.GroupID
 		if gid == 0 {
 			gid = -ctx.Event.UserID
 		}
 		bpl := bdb.getAllPushByGroup(gid)
-		msg := "--------b站推送列表--------"
+		msg := "--------B站推送列表--------"
 		for _, v := range bpl {
 			if _, ok := upMap[v.BilibiliUID]; !ok {
 				bdb.updateAllUp()
@@ -157,7 +158,7 @@ func init() {
 			ctx.SendChain(message.Text("ERROR: 可能被风控了"))
 		}
 	})
-	en.OnFullMatch("拉取b站推送").SetBlock(true).Handle(func(ctx *zero.Ctx) {
+	en.OnRegex(`拉取[B|b]站推送$`).SetBlock(true).Handle(func(ctx *zero.Ctx) {
 		err := sendDynamic(ctx)
 		if err != nil {
 			ctx.SendPrivateMessage(ctx.Event.UserID, message.Text("Error: bilibilipush,", err))
@@ -274,7 +275,7 @@ func sendDynamic(ctx *zero.Ctx) error {
 			ct := cardList[i].Get("desc.timestamp").Int()
 			if ct > t && ct > time.Now().Unix()-600 {
 				lastTime[buid] = ct
-				m, ok := control.Lookup(serviceName)
+				m, ok := control.Lookup("bilibilipush")
 				if ok {
 					groupList := bdb.getAllGroupByBuidAndDynamic(buid)
 					dc, err := bz.LoadDynamicDetail(cardList[i].Raw)
@@ -323,7 +324,7 @@ func sendLive(ctx *zero.Ctx) error {
 		oldStatus := liveStatus[key.Int()]
 		if newStatus != oldStatus && newStatus == 1 {
 			liveStatus[key.Int()] = newStatus
-			m, ok := control.Lookup(serviceName)
+			m, ok := control.Lookup("bilibilipush")
 			if ok {
 				groupList := bdb.getAllGroupByBuidAndLive(key.Int())
 				roomID := value.Get("short_id").Int()
