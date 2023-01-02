@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/fumiama/sqlite3" // use sql
 	zero "github.com/wdvxdr1123/ZeroBot"
 	"github.com/wdvxdr1123/ZeroBot/message"
 	"github.com/wdvxdr1123/ZeroBot/utils/helper"
@@ -33,7 +32,8 @@ var reg = regexp.MustCompile(".*/(.*)")
 func init() {
 	engine := control.Register("vtbquotation", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Help:             "vtbkeyboard.moe\n- vtb语录\n- 随机vtb\n- 更新vtb\n",
+		Brief:            "vtb语录",
+		Help:             "- vtb语录\n- 随机vtb\n- 更新vtb\n来源: vtbkeyboard.moe",
 		PublicDataFolder: "VtbQuotation",
 	})
 	dbfile := engine.DataFolder() + "vtb.db"

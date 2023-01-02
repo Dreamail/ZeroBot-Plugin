@@ -40,6 +40,9 @@ var (
 		3: "Superchat",
 		4: "进入直播间",
 		5: "标题变动",
+		6: "分区变动",
+		7: "直播中止",
+		8: "直播继续",
 	}
 	cfg = bz.NewCookieConfig("data/Bilibili/config.json")
 )
@@ -48,13 +51,14 @@ var (
 func init() {
 	engine := control.Register("bilibili", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Help: "bilibili (412就是拦截的意思,建议私聊把cookie设全)\n" +
-			"- >vup info [xxx]\n" +
+		Brief:            "b站查成分查弹幕",
+		Help: "- >vup info [xxx]\n" +
 			"- >user info [xxx]\n" +
 			"- 查成分 [xxx]\n" +
 			"- 查弹幕 [xxx]\n" +
 			"- 设置b站cookie b_ut=7;buvid3=0;i-wanna-go-back=-1;innersign=0;\n" +
-			"- 更新vup",
+			"- 更新vup" +
+			"Tips: (412就是拦截的意思,建议私聊把cookie设全)\n",
 		PublicDataFolder: "Bilibili",
 	})
 	cachePath := engine.DataFolder() + "cache/"
@@ -184,7 +188,7 @@ func init() {
 				canvas.DrawImage(back, 0, 0)
 			}
 			canvas.SetColor(color.Black)
-			_, err = file.GetLazyData(text.BoldFontFile, true)
+			_, err = file.GetLazyData(text.BoldFontFile, control.Md5File, true)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
 			}
@@ -318,7 +322,7 @@ func init() {
 		}
 		canvas := gg.NewContext(100, 100)
 		fontSize := 50.0
-		_, err = file.GetLazyData(text.BoldFontFile, true)
+		_, err = file.GetLazyData(text.BoldFontFile, control.Md5File, true)
 		if err != nil {
 			ctx.SendChain(message.Text("ERROR: ", err))
 		}
@@ -491,10 +495,16 @@ func init() {
 					canvas.DrawString(t, moveW, danmuNow)
 					canvas.SetColor(color.Black)
 					moveW += l + dz
-				case 4, 5:
+				case 4, 5, 6, 7, 8:
 					t = danmakuTypeMap[danItem.Type]
 					canvas.SetRGB255(0, 128, 0)
 					l, _ = canvas.MeasureString(t)
+					canvas.DrawString(t, moveW, danmuNow)
+					canvas.SetColor(color.Black)
+					moveW += l + dz
+				default:
+					canvas.SetRGB255(0, 128, 0)
+					l, _ = canvas.MeasureString("未知类型" + strconv.Itoa(int(danItem.Type)))
 					canvas.DrawString(t, moveW, danmuNow)
 					canvas.SetColor(color.Black)
 					moveW += l + dz

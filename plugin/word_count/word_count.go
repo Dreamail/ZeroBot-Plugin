@@ -34,8 +34,8 @@ var (
 func init() {
 	engine := control.Register("wordcount", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Help: "聊天热词\n" +
-			"- 热词 [群号] [消息数目]|热词 123456 1000",
+		Brief:            "聊天热词",
+		Help:             "- 热词 [群号] [消息数目]|热词 123456 1000",
 		PublicDataFolder: "WordCount",
 	})
 	cachePath := engine.DataFolder() + "cache/"
@@ -58,7 +58,7 @@ func init() {
 		return true
 	})).Limit(ctxext.LimitByUser).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
-			_, err := file.GetLazyData(text.FontFile, true)
+			_, err := file.GetLazyData(text.FontFile, control.Md5File, true)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
 				return

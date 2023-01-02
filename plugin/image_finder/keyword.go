@@ -64,8 +64,8 @@ var hrefre = regexp.MustCompile(`<a href=".*">`)
 func init() {
 	control.Register("imgfinder", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
-		Help: "关键字搜图\n" +
-			"- 来张 [xxx]",
+		Brief:            "关键字搜图",
+		Help:             "- 来张 [xxx]",
 	}).OnRegex(`^来张\s?(.*)$`, zero.AdminPermission).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			keyword := ctx.State["regex_matched"].([]string)[1]
@@ -79,6 +79,10 @@ func init() {
 			illust, err := pixiv.Works(il.ID)
 			if err != nil {
 				ctx.SendChain(message.Text("ERROR: ", err))
+				return
+			}
+			if len(illust.ImageUrls) == 0 {
+				ctx.SendChain(message.Text("ERROR: nil image url"))
 				return
 			}
 			u := illust.ImageUrls[0]

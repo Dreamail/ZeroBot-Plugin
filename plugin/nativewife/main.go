@@ -17,6 +17,7 @@ import (
 	"github.com/wdvxdr1123/ZeroBot/utils/helper"
 
 	"github.com/FloatTech/floatbox/file"
+	"github.com/FloatTech/floatbox/process"
 	ctrl "github.com/FloatTech/zbpctrl"
 	"github.com/FloatTech/zbputils/control"
 )
@@ -24,7 +25,8 @@ import (
 func init() {
 	engine := control.Register("nwife", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault:  false,
-		Help:              "nativewife\n- 抽wife[@xxx]\n- 添加wife[名字][图片]\n- 删除wife[名字]\n- [让 | 不让]所有人均可添加wife",
+		Brief:             "本地老婆",
+		Help:              "- 抽wife[@xxx]\n- 添加wife[名字][图片]\n- 删除wife[名字]\n- [让 | 不让]所有人均可添加wife",
 		PrivateDataFolder: "nwife",
 	})
 	base := engine.DataFolder()
@@ -77,8 +79,9 @@ func init() {
 						return
 					}
 				}
-				err := file.DownloadTo(url, grpfolder+"/"+name, true)
+				err := file.DownloadTo(url, grpfolder+"/"+name)
 				if err == nil {
+					process.SleepAbout1sTo2s()
 					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("成功！"))
 				} else {
 					ctx.SendChain(message.Reply(ctx.Event.MessageID), message.Text("错误：", err.Error()))
