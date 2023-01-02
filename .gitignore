@@ -1,9 +1,11 @@
 plugins/*.so
 plugins/*.dll
 .idea/
+.fleet/settings.json
 .DS_Store
 .vscode
 go-zero*
 nohup.out
 zerobot
 ZeroBot-Plugin*
+zbp*

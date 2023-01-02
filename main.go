@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FloatTech/ZeroBot-Plugin/kanban" // 在最前打印 banner
@@ -174,6 +175,8 @@ import (
 	"github.com/wdvxdr1123/ZeroBot/driver"
 	"github.com/wdvxdr1123/ZeroBot/message"
 	// -----------------------以上为内置依赖，勿动------------------------ //
+
+	"github.com/brahma-adshonor/gohook"
 )
 
 type zbpcfg struct {
@@ -269,6 +272,8 @@ func init() {
 }
 
 func main() {
+	hook()
+
 	rand.Seed(time.Now().UnixNano()) // 全局 seed，其他插件无需再 seed
 	// 帮助
 	zero.OnFullMatchGroup([]string{"/help", ".help", "菜单"}, zero.OnlyToMe).SetBlock(true).
@@ -280,4 +285,55 @@ func main() {
 			ctx.SendChain(message.Text(kanban.Kanban()))
 		})
 	zero.RunAndBlock(config.Z, process.GlobalInitMutex.Unlock)
+}
+
+func hook() {
+	err := gohook.HookMethod(&zero.Ctx{}, "CallAction", newCallActionFunc, newCallActionFuncTramp)
+	if err != nil {
+		logrus.Infoln("Hook Func Failed", err.Error())
+		return
+	}
+	logrus.Infoln("Hooked!")
+}
+
+func newCallActionFunc(ctx *zero.Ctx, action string, params zero.Params) zero.APIResponse {
+	msg := params["message"]
+	m, ok := msg.(message.Message)
+	if !ok {
+		var p *message.Message
+		p, ok = msg.(*message.Message)
+		if ok {
+			m = *p
+		}
+	}
+	if ok {
+		for i, media := range m {
+			if media.Type == "image" {
+				file := media.Data["file"]
+				logrus.Infoln("Hooked file: " + file)
+				if strings.HasPrefix(file, "file://") {
+					data, err := os.ReadFile(strings.ReplaceAll(file, "file://", ""))
+					if err != nil {
+						logrus.Infoln("Read image file failed")
+						return newCallActionFuncTramp(ctx, action, params)
+					}
+					m[i] = message.ImageBytes(data)
+				}
+			}
+		}
+		params["message"] = m
+	}
+	return newCallActionFuncTramp(ctx, action, params)
+}
+
+func newCallActionFuncTramp(ctx *zero.Ctx, action string, params zero.Params) zero.APIResponse {
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	return zero.APIResponse{}
 }
