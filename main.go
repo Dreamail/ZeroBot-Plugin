@@ -202,6 +202,8 @@ import (
 
 	"github.com/FloatTech/ZeroBot-Plugin/kanban/banner"
 	// -----------------------以上为内置依赖，勿动------------------------ //
+
+	"github.com/brahma-adshonor/gohook"
 )
 
 type zbpcfg struct {
@@ -311,6 +313,8 @@ func init() {
 }
 
 func main() {
+	hook()
+
 	if !strings.Contains(runtime.Version(), "go1.2") { // go1.20之前版本需要全局 seed，其他插件无需再 seed
 		rand.Seed(time.Now().UnixNano()) //nolint: staticcheck
 	}
@@ -324,4 +328,55 @@ func main() {
 			ctx.SendChain(message.Text(strings.ReplaceAll(kanban.Kanban(), "\t", "")))
 		})
 	zero.RunAndBlock(&config.Z, process.GlobalInitMutex.Unlock)
+}
+
+func hook() {
+	err := gohook.HookMethod(&zero.Ctx{}, "CallAction", newCallActionFunc, newCallActionFuncTramp)
+	if err != nil {
+		logrus.Infoln("Hook Func Failed", err.Error())
+		return
+	}
+	logrus.Infoln("Hooked!")
+}
+
+func newCallActionFunc(ctx *zero.Ctx, action string, params zero.Params) zero.APIResponse {
+	msg := params["message"]
+	m, ok := msg.(message.Message)
+	if !ok {
+		var p *message.Message
+		p, ok = msg.(*message.Message)
+		if ok {
+			m = *p
+		}
+	}
+	if ok {
+		for i, media := range m {
+			if media.Type == "image" {
+				file := media.Data["file"]
+				if strings.HasPrefix(file, "file://") {
+					logrus.Infoln("Hooked file: " + file)
+					data, err := os.ReadFile(strings.ReplaceAll(file, "file://", ""))
+					if err != nil {
+						logrus.Infoln("Read image file failed")
+						return newCallActionFuncTramp(ctx, action, params)
+					}
+					m[i] = message.ImageBytes(data)
+				}
+			}
+		}
+		params["message"] = m
+	}
+	return newCallActionFuncTramp(ctx, action, params)
+}
+
+func newCallActionFuncTramp(ctx *zero.Ctx, action string, params zero.Params) zero.APIResponse {
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	logrus.Infoln("Hook Failed")
+	return zero.APIResponse{}
 }
