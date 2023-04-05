@@ -1,0 +1,51 @@
+name: Build with xgo
+
+on: [push, pull_request]
+
+jobs:
+  xgo:
+    name: Build ZeroBot-Plugin-Dynamic on Push 🚀
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Build
+        uses: crazy-max/ghaction-xgo@v2
+        with:
+          xgo_version: latest
+          go_version: latest
+          dest: build
+          prefix: zbpd
+          targets: linux/amd64,linux/arm64,darwin/amd64,darwin/arm64
+          v: true
+          x: false
+          race: false
+          ldflags: -s -w
+          buildmode: default
+          trimpath: false
+
+      - name: Upload linux-amd64
+        uses: actions/upload-artifact@master
+        if: ${{ !github.head_ref }}
+        with:
+          name: zbpd-linux-amd64
+          path: build/zbpd-linux-amd64
+      - name: Upload linux-arm64
+        uses: actions/upload-artifact@master
+        if: ${{ !github.head_ref }}
+        with:
+          name: zbpd-linux-arm64
+          path: build/zbpd-linux-arm64
+      - name: Upload darwin-amd64
+        uses: actions/upload-artifact@master
+        if: ${{ !github.head_ref }}
+        with:
+          name: zbpd-darwin-amd64
+          path: build/zbpd-darwin-amd64
+      - name: Upload darwin-arm64
+        uses: actions/upload-artifact@master
+        if: ${{ !github.head_ref }}
+        with:
+          name: zbpd-darwin-arm64
+          path: build/zbpd-darwin-arm64
