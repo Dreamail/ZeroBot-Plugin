@@ -52,6 +52,7 @@ func init() {
 	}).ApplySingle(ctxext.DefaultSingle)
 	en.OnRegex("^让(宁宁|爱瑠|芳乃|茉子|丛雨|小春|七海)说([A-Za-z\\s\\d\u3005\u3040-\u30ff\u4e00-\u9fff\uff11-\uff19\uff21-\uff3a\uff41-\uff5a\uff66-\uff9d\\pP]+)$").Limit(ctxext.LimitByGroup).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
+			ctx.Send(message.Text("等一下哦，要清嗓子的嘛～"))
 			text := ctx.State["regex_matched"].([]string)[2]
 			id := speakers[ctx.State["regex_matched"].([]string)[1]]
 			b64, err := downloadBase64(fmt.Sprintf(jpapi, url.QueryEscape(text), id))
@@ -63,6 +64,7 @@ func init() {
 		})
 	en.OnRegex("^让(Sua|Mimiru|Arin|Yeonhwa|Yuhwa|Seonbae)说([A-Za-z\\s\\d\u3131-\u3163\uac00-\ud7ff\\pP]+)$").Limit(ctxext.LimitByGroup).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
+			ctx.Send(message.Text("等一下哦，要清嗓子的嘛～"))
 			text := ctx.State["regex_matched"].([]string)[2]
 			id := speakers[ctx.State["regex_matched"].([]string)[1]]
 			b64, err := downloadBase64(fmt.Sprintf(krapi, url.QueryEscape(text), id))
@@ -77,6 +79,7 @@ func init() {
 			if 原.k == "" {
 				return
 			}
+			ctx.Send(message.Text("等一下哦，要清嗓子的嘛～"))
 			text := ctx.State["regex_matched"].([]string)[2]
 			id := speakers[ctx.State["regex_matched"].([]string)[1]]
 			b64, err := downloadBase64(fmt.Sprintf(genshin.CNAPI, id, url.QueryEscape(text), url.QueryEscape(原.k)))
