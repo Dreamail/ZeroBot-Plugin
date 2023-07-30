@@ -2,7 +2,10 @@
 package moegoe
 
 import (
+	"encoding/base64"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 
 	zero "github.com/wdvxdr1123/ZeroBot"
@@ -27,6 +30,18 @@ var speakers = map[string]uint{
 
 var 原 = newapikeystore("./data/tts/o.txt")
 
+func downloadBase64(url string) (string, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(data), nil
+}
+
 func init() {
 	en := control.Register("moegoe", &ctrl.Options[*zero.Ctx]{
 		DisableOnDefault: false,
@@ -39,13 +54,23 @@ func init() {
 		Handle(func(ctx *zero.Ctx) {
 			text := ctx.State["regex_matched"].([]string)[2]
 			id := speakers[ctx.State["regex_matched"].([]string)[1]]
-			ctx.SendChain(message.Record(fmt.Sprintf(jpapi, url.QueryEscape(text), id)))
+			b64, err := downloadBase64(fmt.Sprintf(jpapi, url.QueryEscape(text), id))
+			if err != nil {
+				ctx.Send(message.Text("下载语音错误：" + err.Error()))
+				return
+			}
+			ctx.SendChain(message.Record("base64://" + b64))
 		})
 	en.OnRegex("^让(Sua|Mimiru|Arin|Yeonhwa|Yuhwa|Seonbae)说([A-Za-z\\s\\d\u3131-\u3163\uac00-\ud7ff\\pP]+)$").Limit(ctxext.LimitByGroup).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
 			text := ctx.State["regex_matched"].([]string)[2]
 			id := speakers[ctx.State["regex_matched"].([]string)[1]]
-			ctx.SendChain(message.Record(fmt.Sprintf(krapi, url.QueryEscape(text), id)))
+			b64, err := downloadBase64(fmt.Sprintf(krapi, url.QueryEscape(text), id))
+			if err != nil {
+				ctx.Send(message.Text("下载语音错误：" + err.Error()))
+				return
+			}
+			ctx.SendChain(message.Record("base64://" + b64))
 		})
 	en.OnRegex("^让(派蒙|凯亚|安柏|丽莎|琴|香菱|枫原万叶|迪卢克|温迪|可莉|早柚|托马|芭芭拉|优菈|云堇|钟离|魈|凝光|雷电将军|北斗|甘雨|七七|刻晴|神里绫华|雷泽|神里绫人|罗莎莉亚|阿贝多|八重神子|宵宫|荒泷一斗|九条裟罗|夜兰|珊瑚宫心海|五郎|达达利亚|莫娜|班尼特|申鹤|行秋|烟绯|久岐忍|辛焱|砂糖|胡桃|重云|菲谢尔|诺艾尔|迪奥娜|鹿野院平藏)说([\\s\u4e00-\u9fa5\\pP]+)$").Limit(ctxext.LimitByGroup).SetBlock(true).
 		Handle(func(ctx *zero.Ctx) {
@@ -54,6 +79,11 @@ func init() {
 			}
 			text := ctx.State["regex_matched"].([]string)[2]
 			id := speakers[ctx.State["regex_matched"].([]string)[1]]
-			ctx.SendChain(message.Record(fmt.Sprintf(genshin.CNAPI, id, url.QueryEscape(text), url.QueryEscape(原.k))))
+			b64, err := downloadBase64(fmt.Sprintf(genshin.CNAPI, id, url.QueryEscape(text), url.QueryEscape(原.k)))
+			if err != nil {
+				ctx.Send(message.Text("下载语音错误：" + err.Error()))
+				return
+			}
+			ctx.SendChain(message.Record("base64://" + b64))
 		})
 }
